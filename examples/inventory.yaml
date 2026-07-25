@@ -1,0 +1,108 @@
+secrets:
+  - id: payments-db-app
+    kind: database_password
+    owner: Payments Platform
+    backend: simulated
+    description: >-
+      Application account for the payments database. PostgreSQL cannot hold two
+      valid passwords for one role, so this rotates as a hard cutover and the
+      consumers restart together.
+    max_age: 90d
+    lead_time: 14d
+    consumers: [payments-api, settlement-worker]
+    tags: [pci, production]
+    versions:
+      - version: 3
+        state: active
+        created_at: "2026-01-08T09:00:00Z"
+        fingerprint: "sha256:1f4c9b2a7e83d5610c4f8ab29d7e0361"
+
+  - id: vendor-reconciliation-key
+    kind: api_key
+    owner: Payments Platform
+    backend: simulated
+    description: API key issued to the reconciliation vendor. Overlap is supported.
+    max_age: 60d
+    overlap: 48h
+    lead_time: 10d
+    consumers: [settlement-worker, reporting-batch]
+    tags: [third-party, production]
+    versions:
+      - version: 7
+        state: active
+        created_at: "2026-04-02T11:30:00Z"
+        fingerprint: "sha256:9ab31d77c0e2f45518aa6b3390cd7e12"
+
+  - id: api-gateway-tls
+    kind: tls_certificate
+    owner: Platform Engineering
+    backend: simulated
+    description: Public TLS certificate for the payments API.
+    max_age: 365d
+    overlap: 24h
+    lead_time: 30d
+    consumers: [api-gateway]
+    tags: [production, internet-facing]
+    versions:
+      - version: 12
+        state: active
+        created_at: "2026-05-14T00:00:00Z"
+        expires_at: "2026-08-12T00:00:00Z"
+        fingerprint: "sha256:44c1e9b7f2ad38650bb1c8e5709fa236"
+
+  - id: swift-signing-key
+    kind: signing_key
+    owner: Treasury Operations
+    backend: simulated
+    description: HSM-backed key signing outbound settlement batches.
+    max_age: 730d
+    overlap: 168h
+    lead_time: 60d
+    consumers: [settlement-worker]
+    tags: [production, hsm, critical]
+    versions:
+      - version: 2
+        state: active
+        created_at: "2024-11-20T08:00:00Z"
+        fingerprint: "sha256:70bd4f19a6c3e28815df0a4b62397ce4"
+
+  - id: legacy-batch-ftp
+    kind: service_account
+    owner: unassigned
+    backend: simulated
+    description: >-
+      Service account for the nightly file transfer. Nobody has claimed it and
+      it has never been rotated - which is exactly the shape of credential that
+      appears in a breach report.
+    max_age: 90d
+    lead_time: 14d
+    consumers: [batch-transfer]
+    tags: [legacy, production]
+    versions:
+      - version: 1
+        state: active
+        created_at: "2019-03-11T02:00:00Z"
+        fingerprint: "sha256:c1b0e7a4d5928f36104ab7cd2e83f095"
+      - version: 0
+        state: retired
+        created_at: "2018-01-04T02:00:00Z"
+        fingerprint: "sha256:aa17c3e9042b5d768f1092ba3ce4d571"
+        note: superseded in 2019 and never revoked
+
+  - id: partner-sftp-key
+    kind: ssh_key
+    owner: Vendor Management
+    backend: read-only
+    description: >-
+      Key held on the partner's side. Rotation is theirs to carry out; tracked
+      here so it still comes due rather than being invisible.
+    max_age: 180d
+    overlap: 72h
+    lead_time: 21d
+    consumers: [file-exchange]
+    tags: [third-party]
+    versions:
+      - version: 4
+        state: active
+        created_at: "2026-03-01T00:00:00Z"
+        fingerprint: "sha256:e8f2b0146a9c3d57709b2ea4f61cd830"
