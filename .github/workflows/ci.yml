@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: pytest -q
+
+  guardrails:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+
+      - name: The inventory parses and reports
+        run: slm --inventory examples/inventory.yaml inventory --json inventory.json
+
+      - name: A dry run changes nothing
+        run: |
+          slm --inventory examples/inventory.yaml rotate vendor-reconciliation-key
+          python - <<'PY'
+          import json
+          before = json.load(open("inventory.json"))
+          secret = next(s for s in before["secrets"] if s["id"] == "vendor-reconciliation-key")
+          assert len(secret["versions"]) == 1, "a dry run created a version"
+          print("dry run touched nothing")
+          PY
+
+      - name: Rotation refuses to revoke when a consumer has not migrated
+        # The property the whole state machine exists for.
+        run: |
+          python - <<'PY'
+          from slm.backends import SimulatedBackend
+          from slm.model import load
+          from slm.rotation import Phase, Outcome, rotate
+
+          inventory = load("examples/inventory.yaml")
+          secret = inventory.get("vendor-reconciliation-key")
+          backend = SimulatedBackend(stubborn={"reporting-batch"})
+          result = rotate(secret, backend, dry_run=False)
+
+          revoke = next(r for r in result.records if r.phase is Phase.REVOKE)
+          assert revoke.outcome is Outcome.SKIPPED, "revoked despite an unmigrated consumer"
+          assert not result.completed
+          print("old version correctly left valid")
+          PY
+
+      - name: The inventory never contains a secret value
+        run: |
+          python - <<'PY'
+          import json
+          from slm.backends import SimulatedBackend
+          from slm.model import load
+          from slm.rotation import rotate
+
+          inventory = load("examples/inventory.yaml")
+          secret = inventory.get("vendor-reconciliation-key")
+          backend = SimulatedBackend()
+          rotate(secret, backend, dry_run=False)
+
+          serialised = json.dumps(inventory.to_dict())
+          for value in backend.issued.values():
+              assert value not in serialised, "a secret value reached the inventory"
+          print("only fingerprints are stored")
+          PY
