@@ -1,0 +1,53 @@
+{
+  "jobs": [
+    {
+      "root": ".",
+      "label": "secrets-lifecycle-manager",
+      "caption": "Inventory and rotation planning on the bundled synthetic inventory. No secrets are fetched and no rotation is executed.",
+      "setup": [
+        [
+          "python",
+          "-m",
+          "pip",
+          "install",
+          "-e",
+          ".[dev]"
+        ],
+        [
+          "python",
+          "-m",
+          "pip",
+          "install",
+          "pytest",
+          "pytest-asyncio",
+          "pytest-cov",
+          "responses",
+          "respx",
+          "socksio"
+        ]
+      ],
+      "commands": [
+        [
+          "slm",
+          "--inventory",
+          "examples/inventory.yaml",
+          "inventory"
+        ],
+        [
+          "slm",
+          "--inventory",
+          "examples/inventory.yaml",
+          "plan",
+          "payments-db-app"
+        ],
+        [
+          "python",
+          "-m",
+          "pytest",
+          "-v",
+          "--tb=short"
+        ]
+      ]
+    }
+  ]
+}
